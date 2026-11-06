@@ -6,3 +6,4 @@ c67ad2a	2.695369	26.9	discard	lower weight decay to 0.1
 5efc7aa	1.807902	20.7	keep	reduce depth from 8 to 4
 766a25f	2.276842	8.3	keep	baseline on this hardware (nov6 run)
 e0448f1	2.705417	8.3	discard	halve total batch size to 2^15 (only 4 steps ran)
+0dc0b02	2.668877	8.3	discard	halve total batch size to 2^15 rerun (only 10 steps; machine slow)
