@@ -26,3 +26,4 @@ c495e45	1.611205	3.6	discard	depth 3 (1061 steps)
 10f520f	1.574376	3.6	discard	window pattern L
 8e17e36	1.569748	3.6	discard	scalar LR 0.25
 3ccac4c	1.610434	3.6	discard	warmup ratio 0.05
+ddcaa00	1.552142	3.6	keep	re-run of best config (noise check): 1.525793 -> 1.552142
