@@ -110,8 +110,34 @@ After the `mx.compile` win, I tested larger changes instead of learning-rate twe
 - **The momentum 0.9 gain is small.** It cleared the 95% gate because the runs were very tight, but a bootstrap over 3 runs can be overconfident on a -0.004 difference. Treat it as probable, not certain.
 - **Run-to-run noise dropped.** With Muon and `mx.compile`, the three runs of a config agree within about 0.005, against about 0.024 for the phase 2 baseline. That makes smaller effects measurable.
 
+## Phase 4: working through the untried ideas
+
+| Experiment | val_bpb | Verdict |
+|---|---|---|
+| Muon momentum 0.85 | 1.4037 (1.402, 1.400, 1.409) | **keep** (-0.008, P = 1.00) |
+| Muon momentum 0.8 | 1.4102 (1 run) | discard |
+| Batch 2^12 (device batch 2) under Muon | 1.4571 (1 run) | discard |
+| Embedding LR 0.6 under Muon | 1.4050 (1 run) | discard (essentially a tie) |
+| Muon LR 0.03 at momentum 0.85 | 1.4158 (1 run) | discard |
+| MLP width 3x | 1.4165 (1 run) | discard (no speedup: 283 ms/step) |
+
+- **Momentum:** 0.95 -> 0.9 -> 0.85 each helped, and 0.8 was worse, so 0.85 is the optimum. With only about 1,200 steps, a shorter momentum memory pays off.
+- **Muon LR:** 0.02 is still best after the momentum change (0.03 was worse).
+- **Batch size:** 2^13 is still right. 2^12 lost by about 0.05 under Muon too.
+- **Embedding LR:** 0.6 and 1.0 are within noise of each other. 1.0 was kept because the change didn't clear the gate.
+- **MLP width:** 3x was worse and gave no speedup. The MLP isn't the bottleneck, because the 32768-token vocabulary logits dominate step time.
+- **Skipped on purpose:**
+  - *Depth 5:* with `ASPECT_RATIO` 64 it also widens the model from 256 to 384. That roughly halves the step count, which is what sank depth 6 in phase 1.
+  - *Gradient clipping:* Muon normalizes the matrix updates and Adam is close to scale-invariant, so global-norm clipping would barely change the updates.
+
 ## Current state
-Branch `autoresearch/nov6` is at `4f0d146`. `train.py` is the kept config: batch 2^13 (device batch 4), Muon for the block matrices (LR 0.02, momentum 0.9, weight decay 0.2), AdamW for the rest (embedding LR 1.0), and the compiled loss/grad function. Its val_bpb is 1.4122 (3-run mean), against the 2.277 baseline.
+`train.py` is the kept config:
+- batch 2^13 (device batch 4)
+- Muon for the block matrices (LR 0.02, momentum 0.85, weight decay 0.2)
+- AdamW for the rest (embedding LR 1.0)
+- the compiled loss/grad function
+
+Its val_bpb is 1.4037 (3-run mean), against the 2.277 baseline.
 
 | Milestone | val_bpb |
 |---|---|
@@ -120,5 +146,6 @@ Branch `autoresearch/nov6` is at `4f0d146`. `train.py` is the kept config: batch
 | `mx.compile` | 1.467 |
 | Muon | 1.416 |
 | Muon momentum 0.9 | 1.412 |
+| Muon momentum 0.85 | 1.404 |
 
-The loop is paused, not finished. Ideas not yet tried: Muon momentum 0.85 or a momentum warmup, retuning embedding and unembedding LRs now that Muon handles the matrices, batch 2^12 or depth 5 again under Muon, MLP width or activation, and gradient clipping.
+The loop is paused, not finished. The easy knobs are mostly exhausted. The remaining big lever is step time, which is dominated by the full-vocabulary logits and loss. Profiling that path and making it cheaper (for example, a fused or chunked cross-entropy) is the most promising next direction. A momentum warmup schedule for Muon is also still untested.
