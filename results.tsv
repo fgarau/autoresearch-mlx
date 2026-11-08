@@ -48,3 +48,4 @@ b3983e4	1.434808	-	discard	[rigor 1 seed] Muon weight decay 0.0
 e9214e5	1.457053	-	discard	[rigor 1 seed] batch 2^12 (device batch 2) under Muon
 2073e0b	1.404985	-	discard	[rigor 1 seed] embedding LR 0.6 under Muon (tie)
 19a742c	1.415762	-	discard	[rigor 1 seed] Muon lr 0.03 at momentum 0.85
+3f384a6	1.416500	-	discard	[rigor 1 seed] MLP width 3x (no speedup)
