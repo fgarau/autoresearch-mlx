@@ -37,3 +37,4 @@ af55754	1.476467	-	discard	[rigor 3 seeds] warmdown ratio 0.3
 1c25466	1.488633	-	discard	[rigor 1 seed] value embeddings on all layers
 5e06940	1.545677	-	discard	[rigor 1 seed] remove logit softcap
 17fa131	1.470965	-	discard	[rigor 1 seed] x0_lambdas init 0.3
+fe858db	1.477693	-	discard	[rigor 1 seed] bf16 logits (no fp32 cast; no speedup)
