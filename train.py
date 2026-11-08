@@ -229,8 +229,25 @@ class GPT(nn.Module):
         return mx.sum(ce) / denom
 
 
-class AdamW:
-    def __init__(self, model, unembedding_lr, embedding_lr, matrix_lr, weight_decay, adam_betas, scalar_lr):
+@mx.compile
+def newton_schulz(g, steps=5):
+    """Approximately orthogonalize g (quintic Newton-Schulz iteration from Muon)."""
+    a, b, c = 3.4445, -4.7750, 2.0315
+    x = g / (mx.linalg.norm(g) + 1e-7)
+    transposed = x.shape[0] > x.shape[1]
+    if transposed:
+        x = x.T
+    for _ in range(steps):
+        A = x @ x.T
+        B = b * A + c * (A @ A)
+        x = a * x + B @ x
+    return x.T if transposed else x
+
+
+class MuonAdamW:
+    """Muon for the 2-D block matrices, AdamW for everything else."""
+
+    def __init__(self, model, unembedding_lr, embedding_lr, matrix_lr, weight_decay, adam_betas, scalar_lr, muon_momentum):
         self.param_config = {}
         self.adam_state = {}
 
@@ -242,8 +259,8 @@ class AdamW:
             if "blocks" in path and param.ndim == 2:
                 self.param_config[path] = {
                     "lr": matrix_lr,
-                    "betas": adam_betas,
-                    "eps": 1e-10,
+                    "muon": True,
+                    "momentum": muon_momentum,
                     "weight_decay": weight_decay,
                 }
             elif "wte" in path:
@@ -307,7 +324,27 @@ class AdamW:
         else:
             setattr(obj, last, value)
 
+    def _muon_step(self, path, grad, param, config):
+        grad_f32 = grad.astype(mx.float32)
+        lr = config["lr"]
+        momentum = config["momentum"]
+
+        if path not in self.adam_state:
+            self.adam_state[path] = {"m": mx.zeros_like(grad_f32)}
+
+        state = self.adam_state[path]
+        state["m"] = momentum * state["m"] + grad_f32
+        update = newton_schulz(grad_f32 + momentum * state["m"])  # Nesterov
+        rows, cols = param.shape
+        scale = max(1.0, rows / cols) ** 0.5
+
+        param_f32 = param.astype(mx.float32) * (1 - lr * config["weight_decay"])
+        param_f32 = param_f32 - lr * scale * update
+        return param_f32.astype(param.dtype)
+
     def _step(self, path, grad, param, config):
+        if config.get("muon"):
+            return self._muon_step(path, grad, param, config)
         grad_f32 = grad.astype(mx.float32)
         param_f32 = param.astype(mx.float32)
         lr = config["lr"]
@@ -355,7 +392,7 @@ class AdamW:
     def state(self):
         arrays = []
         for state in self.adam_state.values():
-            arrays.extend([state["m"], state["v"]])
+            arrays.extend(state[key] for key in ("m", "v") if key in state)
         return arrays
 
 
@@ -368,11 +405,11 @@ ASPECT_RATIO = 64
 HEAD_DIM = 128
 WINDOW_PATTERN = "SSSL"
 
-# v0.1: AdamW only. Muon port is future work.
 TOTAL_BATCH_SIZE = 2**13
 EMBEDDING_LR = 1.0
 UNEMBEDDING_LR = 0.004
-MATRIX_LR = 0.01
+MATRIX_LR = 0.02  # Muon
+MUON_MOMENTUM = 0.95
 SCALAR_LR = 0.5
 WEIGHT_DECAY = 0.2
 ADAM_BETAS = (0.8, 0.95)
@@ -426,7 +463,7 @@ tokens_per_fwdbwd = DEVICE_BATCH_SIZE * MAX_SEQ_LEN
 assert TOTAL_BATCH_SIZE % tokens_per_fwdbwd == 0
 grad_accum_steps = TOTAL_BATCH_SIZE // tokens_per_fwdbwd
 
-optimizer = AdamW(
+optimizer = MuonAdamW(
     model,
     unembedding_lr=UNEMBEDDING_LR,
     embedding_lr=EMBEDDING_LR,
@@ -434,6 +471,7 @@ optimizer = AdamW(
     weight_decay=WEIGHT_DECAY,
     adam_betas=ADAM_BETAS,
     scalar_lr=SCALAR_LR,
+    muon_momentum=MUON_MOMENTUM,
 )
 
 loss_grad_fn = nn.value_and_grad(model, lambda model, inputs, targets: model(inputs, targets=targets))
