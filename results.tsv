@@ -13,3 +13,5 @@ a441e12	1.738608	4.3	keep	batch 2^14 (device batch 8), 483 steps
 af92725	1.698718	3.6	discard	batch 2^12 (device batch 2), 1738 steps
 ee99e42	1.657812	3.6	keep	matrix LR 0.02 (within noise of prior best)
 1b70a12	1.536241	3.6	keep	matrix LR 0.01
+c6b275e	1.547628	3.6	discard	matrix LR 0.005
+a228823	1.612056	3.6	discard	embedding LR 0.3
