@@ -68,6 +68,11 @@ The first four rows were on a machine that was swapping heavily.
 | Head dim 64 | 1.5929 (1 run) | discard |
 | Warmdown ratio 0.3 | 1.4765 (1.466, 1.481, 1.482) | discard (P = 0.06) |
 | Compile the AdamW update | not scored | discard (about 5% faster, +8 net lines) |
+| Disable value embeddings | 1.6369 (1 run) | discard |
+| Value embeddings on all 4 layers (instead of alternating) | 1.4886 (1 run) | discard |
+| Remove logit softcap | 1.5457 (1 run) | discard |
+| `x0_lambdas` init 0.3 (from 0.1) | 1.4710 (1 run) | discard |
+| bf16 logits (drop fp32 cast) | 1.4777 (1 run) | discard (no speedup, 268 ms/step) |
 
 - **The `mx.compile` win:** it cut step time from about 330 ms to about 255 ms, which gives about 30% more steps in the budget. That is worth about 0.08 val_bpb, far more than any hyperparameter tweak.
 - **First attempt crashed:** `mx.compile` flattens its arguments, so the model arrived as a dict (`TypeError: 'dict' object is not callable`). The fix was to compile a lambda that closes over the model, call it as `loss_grad_fn(x, y)`, and build the mask cache eagerly so the graph does not capture tracers. The crash is also in the ledger.
@@ -77,7 +82,14 @@ The first four rows were on a machine that was swapping heavily.
 - `rigor.py` does not report peak memory, so the memory column in `results.tsv` is `-` for these rows.
 - The hashes in `results.tsv` for discards are `rigor.py` file-content hashes, not git commits. The `mx.compile` row uses a git hash.
 
-## Current state
-Branch `autoresearch/nov6` is at `0d2728e`. `train.py` is the kept config: batch 2^13 (device batch 4), matrix LR 0.01, embedding LR 1.0, and the compiled loss/grad function. Its val_bpb is 1.4675 (3-run mean), against the 2.277 baseline.
+### Bigger ideas, second batch
+After the `mx.compile` win, I tested larger changes instead of learning-rate tweaks. None beat the best:
+- **Value embeddings matter.** Removing them cost about 0.17 val_bpb (1.637 against 1.467) with no step-time change. Adding them to all layers did not help (1.489), so alternating layers is a good setting.
+- **The logit softcap matters.** Removing it cost about 0.08 (1.546).
+- **Near-misses are noise.** `x0_lambdas` init 0.3 (1.471) and bf16 logits (1.478) are within the roughly 0.01-0.02 spread between single runs of the best config, and they were dropped on the first-run rule, not proven worse. bf16 logits gave no speedup, so there was no upside.
+- **Speed is the big lever.** The only large win in phase 2 was the 30% step-time cut from `mx.compile`. The compiled AdamW gave only about 5%. The 32768-token vocabulary logits are probably the remaining cost per step, and `prepare.py` fixes the vocabulary.
 
-The loop is paused, not finished. The remaining small hyperparameter tweaks are mostly inside the noise, so bigger ideas are the better use of runs: removing value embeddings, a different logit softcap, or retuning the learning rates for the faster compiled step.
+## Current state
+Branch `autoresearch/nov6` is at `9dbfc80`. `train.py` is unchanged from the kept config: batch 2^13 (device batch 4), matrix LR 0.01, embedding LR 1.0, and the compiled loss/grad function. Its val_bpb is 1.4675 (3-run mean), against the 2.277 baseline.
+
+The loop is paused, not finished. Ideas not yet tried: other architecture changes (MLP width or activation, rope base, residual scaling), gradient clipping given the high embedding LR, and retuning the matrix and embedding learning rates for the faster compiled step.
