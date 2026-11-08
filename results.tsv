@@ -35,3 +35,4 @@ fa66e75	1.592941	-	discard	[rigor 1 seed] head dim 64
 af55754	1.476467	-	discard	[rigor 3 seeds] warmdown ratio 0.3
 218599b	1.636929	-	discard	[rigor 1 seed] disable value embeddings (ve are important)
 1c25466	1.488633	-	discard	[rigor 1 seed] value embeddings on all layers
+5e06940	1.545677	-	discard	[rigor 1 seed] remove logit softcap
