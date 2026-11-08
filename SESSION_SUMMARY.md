@@ -89,7 +89,36 @@ After the `mx.compile` win, I tested larger changes instead of learning-rate twe
 - **Near-misses are noise.** `x0_lambdas` init 0.3 (1.471) and bf16 logits (1.478) are within the roughly 0.01-0.02 spread between single runs of the best config, and they were dropped on the first-run rule, not proven worse. bf16 logits gave no speedup, so there was no upside.
 - **Speed is the big lever.** The only large win in phase 2 was the 30% step-time cut from `mx.compile`. The compiled AdamW gave only about 5%. The 32768-token vocabulary logits are probably the remaining cost per step, and `prepare.py` fixes the vocabulary.
 
-## Current state
-Branch `autoresearch/nov6` is at `9dbfc80`. `train.py` is unchanged from the kept config: batch 2^13 (device batch 4), matrix LR 0.01, embedding LR 1.0, and the compiled loss/grad function. Its val_bpb is 1.4675 (3-run mean), against the 2.277 baseline.
+## Phase 3: Muon optimizer port
 
-The loop is paused, not finished. Ideas not yet tried: other architecture changes (MLP width or activation, rope base, residual scaling), gradient clipping given the high embedding LR, and retuning the matrix and embedding learning rates for the faster compiled step.
+`train.py` said "AdamW only. Muon port is future work." I ported Muon for the 2-D block matrices (attention and MLP weights, plus the small value-embedding gates). Embeddings, `lm_head` and the scalars stay on AdamW. The optimizer class is now `MuonAdamW`.
+
+- **The Muon update:** Nesterov momentum, then a 5-step quintic Newton-Schulz orthogonalization (`newton_schulz`, compiled with `mx.compile`), scaled by sqrt(max(1, rows/cols)), with the same decoupled weight decay as before.
+- **Cost:** step time is unchanged (about 255-275 ms), and the change is about 46 added lines.
+- **Settings:** `MATRIX_LR` is now the Muon LR, and `MUON_MOMENTUM` is a new hyperparameter.
+
+| Experiment | val_bpb | Verdict |
+|---|---|---|
+| Muon, LR 0.02, momentum 0.95 | 1.4162 (1.417, 1.413, 1.418) | **keep** (-0.051, P = 1.00) |
+| Muon LR 0.04 | 1.4328 (1 run) | discard |
+| Muon LR 0.01 | 1.4451 (1 run) | discard |
+| Weight decay 0.0 under Muon | 1.4348 (1 run) | discard |
+| Muon momentum 0.9 | 1.4122 (1.412, 1.413, 1.412) | **keep** (-0.004, P = 1.00) |
+
+- **Muon is the second-biggest win** after the batch-size changes. It gave -0.051 at the same step time.
+- **LR 0.02 is the sweet spot** of 0.01, 0.02 and 0.04. Weight decay still helps under Muon.
+- **The momentum 0.9 gain is small.** It cleared the 95% gate because the runs were very tight, but a bootstrap over 3 runs can be overconfident on a -0.004 difference. Treat it as probable, not certain.
+- **Run-to-run noise dropped.** With Muon and `mx.compile`, the three runs of a config agree within about 0.005, against about 0.024 for the phase 2 baseline. That makes smaller effects measurable.
+
+## Current state
+Branch `autoresearch/nov6` is at `4f0d146`. `train.py` is the kept config: batch 2^13 (device batch 4), Muon for the block matrices (LR 0.02, momentum 0.9, weight decay 0.2), AdamW for the rest (embedding LR 1.0), and the compiled loss/grad function. Its val_bpb is 1.4122 (3-run mean), against the 2.277 baseline.
+
+| Milestone | val_bpb |
+|---|---|
+| Baseline (single run) | 2.277 |
+| End of phase 1 (3-run rescore) | 1.551 |
+| `mx.compile` | 1.467 |
+| Muon | 1.416 |
+| Muon momentum 0.9 | 1.412 |
+
+The loop is paused, not finished. Ideas not yet tried: Muon momentum 0.85 or a momentum warmup, retuning embedding and unembedding LRs now that Muon handles the matrices, batch 2^12 or depth 5 again under Muon, MLP width or activation, and gradient clipping.
