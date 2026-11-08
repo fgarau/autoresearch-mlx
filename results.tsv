@@ -41,3 +41,4 @@ fe858db	1.477693	-	discard	[rigor 1 seed] bf16 logits (no fp32 cast; no speedup)
 5e16144	1.416188	-	keep	[rigor 3 seeds] Muon for block matrices, lr 0.02, momentum 0.95 (P=1.00)
 31cd27e	1.432832	-	discard	[rigor 1 seed] Muon lr 0.04
 02066ae	1.445144	-	discard	[rigor 1 seed] Muon lr 0.01
+b3983e4	1.434808	-	discard	[rigor 1 seed] Muon weight decay 0.0
