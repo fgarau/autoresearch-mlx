@@ -10,3 +10,4 @@ e0448f1	2.705417	8.3	discard	halve total batch size to 2^15 (only 4 steps ran)
 f5f811a	2.082978	8.3	keep	halve total batch size to 2^15 (clean rerun, 147 steps)
 a441e12	1.738608	4.3	keep	batch 2^14 (device batch 8), 483 steps
 6afc0d6	1.678651	3.6	keep	batch 2^13 (device batch 4), 923 steps
+af92725	1.698718	3.6	discard	batch 2^12 (device batch 2), 1738 steps
