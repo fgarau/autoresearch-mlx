@@ -32,3 +32,4 @@ bea6c23	1.491695	-	discard	[rigor 1 seed] batch 2^12 (device batch 2) with compi
 n/a	-	-	discard	compile AdamW update step (only ~5% faster, +8 net lines; not scored)
 379d180	1.490968	-	discard	[rigor 1 seed] adam beta2 0.99
 fa66e75	1.592941	-	discard	[rigor 1 seed] head dim 64
+af55754	1.476467	-	discard	[rigor 3 seeds] warmdown ratio 0.3
