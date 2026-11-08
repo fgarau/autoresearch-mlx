@@ -439,7 +439,8 @@ optimizer = AdamW(
 loss_grad_fn = nn.value_and_grad(model, lambda model, inputs, targets: model(inputs, targets=targets))
 # Build the mask cache eagerly so the compiled graph does not capture tracers.
 mx.eval(model._get_masks(MAX_SEQ_LEN))
-loss_grad_fn = mx.compile(loss_grad_fn, inputs=model.state, outputs=model.state)
+_loss_grad = loss_grad_fn
+loss_grad_fn = mx.compile(lambda inputs, targets: _loss_grad(model, inputs, targets), inputs=model.state, outputs=model.state)
 
 print(f"Time budget: {TIME_BUDGET}s")
 print(f"Gradient accumulation steps: {grad_accum_steps}")
@@ -455,7 +456,7 @@ while True:
     train_loss = None
 
     for _ in range(grad_accum_steps):
-        loss, grads = loss_grad_fn(model, x, y)
+        loss, grads = loss_grad_fn(x, y)
         mx.eval(loss, grads)
         if t_compiled is None:
             t_compiled = time.time()
