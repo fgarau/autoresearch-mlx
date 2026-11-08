@@ -19,3 +19,4 @@ ea8fa68	1.525793	3.6	keep	embedding LR 1.0 (marginal, within noise)
 72adeea	1.601384	3.6	discard	unembedding LR 0.008
 08d75e6	1.574983	3.6	discard	unembedding LR 0.002
 f03875a	1.544450	3.6	discard	weight decay 0.0
+070a981	1.547611	3.6	discard	warmdown ratio 0.7
