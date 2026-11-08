@@ -24,3 +24,4 @@ f03875a	1.544450	3.6	discard	weight decay 0.0
 2271bc2	1.775048	3.8	discard	depth 6 (437 steps)
 c495e45	1.611205	3.6	discard	depth 3 (1061 steps)
 10f520f	1.574376	3.6	discard	window pattern L
+8e17e36	1.569748	3.6	discard	scalar LR 0.25
