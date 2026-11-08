@@ -29,3 +29,4 @@ c495e45	1.611205	3.6	discard	depth 3 (1061 steps)
 ddcaa00	1.552142	3.6	keep	re-run of best config (noise check): 1.525793 -> 1.552142
 2c0b0ba	1.467484	-	keep	[rigor 3 seeds] mx.compile loss/grad function (baseline 1.551242, P=1.00)
 bea6c23	1.491695	-	discard	[rigor 1 seed] batch 2^12 (device batch 2) with compile
+n/a	-	-	discard	compile AdamW update step (only ~5% faster, +8 net lines; not scored)
