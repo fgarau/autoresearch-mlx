@@ -45,3 +45,4 @@ b3983e4	1.434808	-	discard	[rigor 1 seed] Muon weight decay 0.0
 6f40575	1.412154	-	keep	[rigor 3 seeds] Muon momentum 0.9 (small: -0.004, P=1.00)
 82d369e	1.403725	-	keep	[rigor 3 seeds] Muon momentum 0.85 (-0.008, P=1.00)
 61d9583	1.410201	-	discard	[rigor 1 seed] Muon momentum 0.8
+e9214e5	1.457053	-	discard	[rigor 1 seed] batch 2^12 (device batch 2) under Muon
