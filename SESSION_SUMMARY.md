@@ -8,7 +8,7 @@ Branch: `autoresearch/nov6` (HEAD `d128832`). Hardware: Apple Silicon, MLX. Each
 - `prepare.py` and the dependencies were not touched.
 - Python 3.15 upgrade: steps were given only, nothing was changed. A dry-run of the dependency wheels was offered but never requested.
 
-## Results
+## Phase 1: single-run keep/discard results
 
 The first four rows were on a machine that was swapping heavily.
 
@@ -53,12 +53,31 @@ The first four rows were on a machine that was swapping heavily.
 - **Noise.** `rigor.py` says repeat runs vary by about 0.03. A rerun of the best config gave 1.552 against the recorded 1.526. So the matrix LR 0.02 and embedding LR 1.0 "keeps" are probably noise, and the 1.526 best is probably a lucky draw. The near-misses (weight decay 0.0, warmdown 0.7, matrix LR 0.005) may also be noise. The big discards (depth 6, batch 2^12, beta1 0.9, warmup) are real.
 - **Odd training time.** In run 4, `training_seconds` read 398.9 instead of about 300. The cause was not investigated.
 - **Lost log rows.** Twice, a reset onto a kept commit dropped results rows committed on top of it: the LR 0.005 row and the unembedding 0.008 row. Both were re-added. Several hashes in `results.tsv` point to commits that were later reset away.
-- **`rigor.py`.** `program.md` doesn't mention it. The plain keep/discard rule was followed and `rigor.py` was not used.
+- **`rigor.py`.** `program.md` doesn't mention it. Phase 1 (above) used the plain keep/discard rule; phase 2 (below) used `rigor.py`.
+
+## Phase 2: significance-gated loop with `rigor.py`
+
+`rigor.py` scores `train.py` over repeated runs and keeps a change only if it beats the best mean with at least 95% confidence (bootstrap). A candidate whose first run is no better than the best mean is dropped after that one run. Scores live in `rigor_ledger.jsonl`, which is gitignored.
+
+| Experiment | val_bpb | Verdict |
+|---|---|---|
+| Baseline (batch 2^13, matrix LR 0.01, embedding LR 1.0) | 1.5512 +/- 0.024 (1.542, 1.528, 1.584) | baseline |
+| `mx.compile` on the loss/grad function | 1.4675 (1.475, 1.462, 1.465) | **keep** (P(better) = 1.00) |
+| Batch 2^12 (device batch 2) with compile | 1.4917 (1 run) | discard |
+| Adam beta2 0.99 | 1.4910 (1 run) | discard |
+| Head dim 64 | 1.5929 (1 run) | discard |
+| Warmdown ratio 0.3 | 1.4765 (1.466, 1.481, 1.482) | discard (P = 0.06) |
+| Compile the AdamW update | not scored | discard (about 5% faster, +8 net lines) |
+
+- **The `mx.compile` win:** it cut step time from about 330 ms to about 255 ms, which gives about 30% more steps in the budget. That is worth about 0.08 val_bpb, far more than any hyperparameter tweak.
+- **First attempt crashed:** `mx.compile` flattens its arguments, so the model arrived as a dict (`TypeError: 'dict' object is not callable`). The fix was to compile a lambda that closes over the model, call it as `loss_grad_fn(x, y)`, and build the mask cache eagerly so the graph does not capture tracers. The crash is also in the ledger.
+- **The earlier "best" was luck:** the old 1.5258 figure was a lucky single run. Scored over 3 runs, the same config is 1.551.
+
+### Bookkeeping notes
+- `rigor.py` does not report peak memory, so the memory column in `results.tsv` is `-` for these rows.
+- The hashes in `results.tsv` for discards are `rigor.py` file-content hashes, not git commits. The `mx.compile` row uses a git hash.
 
 ## Current state
-Branch `autoresearch/nov6` is at `d128832`. `train.py` holds the best config: batch 2^13 (device batch 4), matrix LR 0.01, embedding LR 1.0, everything else at defaults. Its val_bpb is about 1.53-1.55, against the 2.277 baseline.
+Branch `autoresearch/nov6` is at `0d2728e`. `train.py` is the kept config: batch 2^13 (device batch 4), matrix LR 0.01, embedding LR 1.0, and the compiled loss/grad function. Its val_bpb is 1.4675 (3-run mean), against the 2.277 baseline.
 
-The loop was paused because single-run keep/discard has become noise-dominated. Options:
-1. Switch to `rigor.py` (multi-seed, significance-gated). This is the recommended option.
-2. Keep going with single runs, treating anything under about 0.03 as unproven.
-3. Re-baseline the best config over several seeds first, then test only larger changes.
+The loop is paused, not finished. The remaining small hyperparameter tweaks are mostly inside the noise, so bigger ideas are the better use of runs: removing value embeddings, a different logit softcap, or retuning the learning rates for the faster compiled step.
