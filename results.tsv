@@ -78,3 +78,4 @@ fdf5194	1.357789	-	keep	[rigor 3 seeds] Muon lr 0.04 at batch 2^14 (-0.0011, P=1
 e234863	1.357417	-	discard	[rigor 1 seed] Muon lr 0.07 at batch 2^14
 9e0cda6	1.365089	-	discard	[rigor 1 seed] batch 2^15 + Muon lr 0.07 (378 steps)
 a044fde	1.358406	-	discard	[rigor 3 seeds] embedding LR 1.5 at batch 2^14 (unstable seed 3)
+6bf0ed5	1.361430	-	discard	[rigor 1 seed] unembedding LR 0.006 at batch 2^14
