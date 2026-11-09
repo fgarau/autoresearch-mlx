@@ -53,3 +53,4 @@ e9214e5	1.457053	-	discard	[rigor 1 seed] batch 2^12 (device batch 2) under Muon
 177d8f9	1.376669	-	keep	[rigor 3 seeds] block-local attention, short window 256 (-0.027, P=1.00)
 1033b4e	1.375089	-	keep	[rigor 3 seeds] short window 128 (small: -0.0016, P=1.00)
 fc6407d	1.384796	-	discard	[rigor 1 seed] depth 5 at width 256, pattern SSSSL (251 ms/step)
+77ce2f8	1.373000	-	keep	[rigor 3 seeds] warmdown 0.6 (-0.002, P=1.00)
