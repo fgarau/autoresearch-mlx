@@ -74,3 +74,4 @@ b908387	1.372341	-	discard	[rigor 1 seed] window pattern SLSL (263 ms/step)
 1a7b6a4	1.367584	-	discard	[rigor 1 seed] batch 2^14 (device batch 8), 736 steps
 d189c14	1.358932	-	keep	[rigor 3 seeds] batch 2^14 + Muon lr 0.03 (-0.0044, P=1.00)
 fdf5194	1.357789	-	keep	[rigor 3 seeds] Muon lr 0.04 at batch 2^14 (-0.0011, P=1.00)
+55ba4ce	1.353579	-	keep	[rigor 3 seeds] Muon lr 0.05 at batch 2^14 (-0.0042, P=1.00)
