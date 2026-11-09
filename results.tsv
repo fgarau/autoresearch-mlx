@@ -85,3 +85,4 @@ e84267c	1.364027	-	discard	[rigor 1 seed] Muon momentum 0.8 at batch 2^14
 244bab7	1.360436	-	discard	[rigor 1 seed] value embeddings on all layers (retest)
 673d7da	1.358738	-	discard	[rigor 1 seed] x0_lambdas init 0.3 (retest)
 0b071d5	1.353538	-	discard	[rigor 1 seed] final LR frac 0.05 (near tie)
+6183067	1.371639	-	discard	[rigor 1 seed] scalar LR 1.0
