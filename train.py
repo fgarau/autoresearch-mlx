@@ -45,12 +45,43 @@ def create_additive_causal_mask(seq_len, dtype=mx.float32):
     return mx.where(blocked, mx.array(float("-inf"), dtype=dtype), mx.array(0.0, dtype=dtype))
 
 
-def create_sliding_window_mask(seq_len, window_size, dtype=mx.float32):
-    indices = mx.arange(seq_len)
-    causal = indices[None, :] > indices[:, None]
-    too_far = (indices[:, None] - indices[None, :]) >= window_size
-    blocked = causal | too_far
-    return mx.where(blocked, mx.array(float("-inf"), dtype=dtype), mx.array(0.0, dtype=dtype))
+def create_block_local_mask(seq_len, window_size, dtype=mx.float32):
+    """Sliding-window mask for block_local_attention, shape (num_blocks, 1, window, 2 * window).
+
+    Each block of `window` queries attends to its own block and the previous one; key column b
+    is (b - window) positions after the start of the query's block.
+    """
+    assert seq_len % window_size == 0
+    num_blocks = seq_len // window_size
+    query = mx.arange(window_size)[:, None]
+    key = mx.arange(2 * window_size)[None, :]
+    distance = query + window_size - key
+    allowed = (distance >= 0) & (distance < window_size)
+    has_prev = (mx.arange(num_blocks)[:, None, None] > 0) | (key >= window_size)[None]
+    allowed = allowed[None] & has_prev
+    mask = mx.where(allowed, mx.array(0.0, dtype=dtype), mx.array(float("-inf"), dtype=dtype))
+    return mask[:, None]
+
+
+def block_local_attention(q, k, v, mask, scale):
+    """Sliding-window attention that only computes each block against itself and its predecessor."""
+    batch_size, n_head, seq_len, head_dim = q.shape
+    num_blocks, _, window, _ = mask.shape
+
+    def to_blocks(t):
+        return t.reshape(batch_size, n_head, num_blocks, window, head_dim).transpose(0, 2, 1, 3, 4)
+
+    def with_prev_block(t):
+        prev = mx.concatenate([mx.zeros_like(t[:, :1]), t[:, :-1]], axis=1)
+        return mx.concatenate([prev, t], axis=3).reshape(-1, n_head, 2 * window, head_dim)
+
+    qb = to_blocks(q).reshape(-1, n_head, window, head_dim)
+    kb = with_prev_block(to_blocks(k))
+    vb = with_prev_block(to_blocks(v))
+    mask = mx.broadcast_to(mask[None], (batch_size, *mask.shape)).reshape(-1, 1, window, 2 * window)
+    y = mx.fast.scaled_dot_product_attention(qb, kb, vb, scale=scale, mask=mask)
+    y = y.reshape(batch_size, num_blocks, n_head, window, head_dim).transpose(0, 2, 1, 3, 4)
+    return y.reshape(batch_size, n_head, seq_len, head_dim)
 
 
 def get_peak_memory_mb():
@@ -97,7 +128,10 @@ class CausalSelfAttention(nn.Module):
         k = norm(self.rope(k))
 
         scale = 1.0 / math.sqrt(self.head_dim)
-        y = mx.fast.scaled_dot_product_attention(q, k, v, scale=scale, mask=mask)
+        if mask.ndim == 4:
+            y = block_local_attention(q, k, v, mask, scale)
+        else:
+            y = mx.fast.scaled_dot_product_attention(q, k, v, scale=scale, mask=mask)
         y = y.transpose(0, 2, 1, 3).reshape(batch_size, seq_len, -1)
         return self.c_proj(y)
 
@@ -172,7 +206,7 @@ class GPT(nn.Module):
         pattern = config.window_pattern.upper()
         assert all(char in "SL" for char in pattern)
         long_window = config.sequence_len
-        short_window = long_window // 2
+        short_window = long_window // 8
         char_to_window = {"L": long_window, "S": short_window}
         window_sizes = []
         for layer_idx in range(config.n_layer):
@@ -193,7 +227,7 @@ class GPT(nn.Module):
                 if window_size >= seq_len:
                     self._mask_cache[key] = create_additive_causal_mask(seq_len, dtype=dtype)
                 else:
-                    self._mask_cache[key] = create_sliding_window_mask(seq_len, window_size, dtype=dtype)
+                    self._mask_cache[key] = create_block_local_mask(seq_len, window_size, dtype=dtype)
         return [self._mask_cache[(seq_len, window_size, dtype)] for window_size in self.window_sizes]
 
     def __call__(self, idx, targets=None, reduction="mean"):
