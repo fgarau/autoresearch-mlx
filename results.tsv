@@ -64,3 +64,4 @@ d4dccaa	1.378395	-	discard	[rigor 1 seed] weight decay 0.3
 a2c05da	1.366321	-	keep	[rigor 3 seeds] weight decay 0.1 (-0.0036, P=1.00)
 099ea12	1.369134	-	discard	[rigor 1 seed] weight decay 0.05
 ffac961	1.367167	-	discard	[rigor 3 seeds] logit softcap 10 (P=0.05)
+3202d17	1.367109	-	discard	[rigor 3 seeds] logit softcap 20 (P=0.04)
