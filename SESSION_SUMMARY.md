@@ -159,16 +159,38 @@ I profiled the training step on this machine, an Apple M4 (base). The scratch sc
 - **Noise is now tiny.** The three runs of a config agree within about 0.001, so gains of 0.001-0.002 are real. The small warmdown keeps are trustworthy for that reason, though each is small.
 - **Deeper models still lose.** Even at width 256 and with cheap attention, each extra layer costs more steps than it gains in quality.
 
+### Phase 5, continued: hyperparameter sweep with low noise
+
+| Experiment | val_bpb | Verdict |
+|---|---|---|
+| Unembedding LR 0.006 | 1.3718 (1 run) | discard |
+| Unembedding LR 0.003 | 1.3719 (1 run) | discard |
+| Weight decay 0.3 | 1.3784 (1 run) | discard |
+| Weight decay 0.1 | 1.3663 (1.366, 1.366, 1.367) | **keep** (-0.0036) |
+| Weight decay 0.05 | 1.3691 (1 run) | discard |
+| Logit softcap 10 | 1.3672 | discard (P = 0.05) |
+| Logit softcap 20 | 1.3671 | discard (P = 0.04) |
+| Embedding LR 1.5 | 1.3674 (1 run) | discard |
+| Muon momentum 0.9 (retest) | 1.3663 | discard (tie, P = 0.45) |
+| Short window 64 | 1.3641 | **keep** (-0.0023) |
+| Short window 32 | 1.3634 | **keep** (-0.0007, P = 0.95, marginal) |
+| Pattern SLSL (2 full-attention layers) | 1.3723 (1 run) | discard (263 ms/step) |
+| Long window 512, block-local (no full attention) | 1.3663 (1 run) | discard (faster, 1426 steps, but loses full context) |
+
+- **Optima found:** unembedding LR 0.004, embedding LR 1.0, softcap 15 and Muon momentum 0.85 are all at their optimum.
+- **Weight decay:** the optimum moved down to 0.1 with the longer warmdown.
+- **Attention:** the short-window layers only need very local context. Windows of 32-64 tokens are as good as or better than 128. The single full-attention layer at the end is worth its cost: dropping it (window 512) and adding a second one (SLSL) both lose.
+
 ## Current state
 `train.py` is the kept config:
-- depth 4, width 256, pattern SSSL with short window 128 (block-local) and one full-attention layer
+- depth 4, width 256, pattern SSSL with block-local short window 32 and one full-attention layer
 - batch 2^13 (device batch 4)
-- Muon for the block matrices (LR 0.02, momentum 0.85, weight decay 0.2)
-- AdamW for the rest (embedding LR 1.0)
+- Muon for the block matrices (LR 0.02, momentum 0.85, weight decay 0.1)
+- AdamW for the rest (embedding LR 1.0, unembedding LR 0.004)
 - warmdown 0.85
 - the compiled loss/grad function
 
-Its val_bpb is 1.3700 (3-run mean), against the 2.277 baseline.
+Its val_bpb is 1.3634 (3-run mean), against the 2.277 baseline.
 
 | Milestone | val_bpb |
 |---|---|
@@ -179,5 +201,7 @@ Its val_bpb is 1.3700 (3-run mean), against the 2.277 baseline.
 | Muon momentum 0.85 | 1.404 |
 | Block-local attention (window 256, then 128) | 1.375 |
 | Warmdown 0.85 | 1.370 |
+| Weight decay 0.1 | 1.366 |
+| Short window 64, then 32 | 1.363 |
 
-The loop is still running overnight. Next ideas in the queue: unembedding and embedding LR retunes, weight decay, logit softcap value, and Muon momentum under the new schedule.
+The loop is still running overnight.
