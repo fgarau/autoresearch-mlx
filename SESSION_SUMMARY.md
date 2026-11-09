@@ -200,16 +200,38 @@ I profiled the training step on this machine, an Apple M4 (base). The scratch sc
 - **2^15 is too far.** It leaves only 378 steps in the budget.
 - **What held at 2^14:** the AdamW LRs (embedding 1.0, unembedding 0.004) and Muon momentum 0.85 are still optimal.
 
+### Phase 5, final stretch: retuning at batch 2^14
+
+| Experiment | val_bpb | Verdict |
+|---|---|---|
+| Weight decay 0.05 at 2^14 | 1.3526 (1.352, 1.353, 1.353) | **keep** (-0.0009, P = 0.99) |
+| Value embeddings on all layers (retest) | 1.3604 (1 run) | discard |
+| `x0_lambdas` init 0.3 (retest) | 1.3587 (1 run) | discard |
+| Final LR fraction 0.05 | 1.3535 (1 run) | discard (near tie) |
+| Scalar LR 1.0 | 1.3716 (1 run) | discard |
+| Scalar LR 0.25 (retest) | 1.3592 (1 run) | discard |
+
+- **Weight decay** moved down again (0.1 -> 0.05) because the Muon LR went up 2.5x and decay is applied as LR x weight decay.
+- **Earlier near-misses stay discarded.** Value embeddings on all layers and `x0_lambdas` init 0.3 were dropped back when noise was high. Retested at low noise, they are clearly worse.
+- **The schedule and scalars are at their optimum:** scalar LR 0.5 and a final LR fraction of 0.
+
+## Overnight wrap-up
+Over about 7 hours, the loop ran about 40 scored experiments. The best went from 1.4037 to 1.3526 (3-run means).
+- **Biggest win: block-local attention** (-0.027). It came from profiling, which showed the short-window layers computing full attention and then masking it away.
+- **Second: batch 2^14 together with a 2.5x higher Muon LR** (about -0.010). Neither change won on its own.
+- **Smaller wins:** a shorter attention window (256 -> 32), a longer warmdown (0.5 -> 0.85), and lower weight decay (0.2 -> 0.05).
+- **What didn't help:** extra depth, more full-attention layers, dropping full attention, and loss or dtype rewrites. On this M4 the step is compute-bound on the 32768-token vocabulary matmuls.
+
 ## Current state
 `train.py` is the kept config:
 - depth 4, width 256, pattern SSSL with block-local short window 32 and one full-attention layer
 - batch 2^14 (device batch 8)
-- Muon for the block matrices (LR 0.05, momentum 0.85, weight decay 0.1)
-- AdamW for the rest (embedding LR 1.0, unembedding LR 0.004)
+- Muon for the block matrices (LR 0.05, momentum 0.85, weight decay 0.05)
+- AdamW for the rest (embedding LR 1.0, unembedding LR 0.004, scalar LR 0.5)
 - warmdown 0.85
 - the compiled loss/grad function
 
-Its val_bpb is 1.3536 (3-run mean), against the 2.277 baseline.
+Its val_bpb is 1.3526 (3-run mean), against the 2.277 baseline.
 
 | Milestone | val_bpb |
 |---|---|
@@ -223,5 +245,6 @@ Its val_bpb is 1.3536 (3-run mean), against the 2.277 baseline.
 | Weight decay 0.1 | 1.366 |
 | Short window 64, then 32 | 1.363 |
 | Batch 2^14 with Muon LR 0.05 | 1.354 |
+| Weight decay 0.05 | 1.353 |
 
-The loop is still running.
+The loop is paused. Most single hyperparameters are now at their optimum. Further gains likely need structural ideas, for example a fused cross-entropy Metal kernel to cut the vocabulary-head cost, or rethinking the model shape around the fixed head cost.
