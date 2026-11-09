@@ -57,3 +57,4 @@ fc6407d	1.384796	-	discard	[rigor 1 seed] depth 5 at width 256, pattern SSSSL (2
 4ce5cb2	1.370909	-	keep	[rigor 3 seeds] warmdown 0.7 (-0.002, P=1.00)
 c95a5f2	1.369964	-	keep	[rigor 3 seeds] warmdown 0.85 (small: -0.0009, P=1.00)
 43c74d5	1.369668	-	discard	[rigor 3 seeds] warmdown 1.0 (tie with 0.85, P=0.79)
+773e095	1.370940	-	discard	[rigor 1 seed] Muon lr 0.025
