@@ -181,16 +181,35 @@ I profiled the training step on this machine, an Apple M4 (base). The scratch sc
 - **Weight decay:** the optimum moved down to 0.1 with the longer warmdown.
 - **Attention:** the short-window layers only need very local context. Windows of 32-64 tokens are as good as or better than 128. The single full-attention layer at the end is worth its cost: dropping it (window 512) and adding a second one (SLSL) both lose.
 
+### Phase 5, continued: batch 2^14 with a higher Muon LR
+
+| Experiment | val_bpb | Verdict |
+|---|---|---|
+| Batch 2^14 (device batch 8), Muon LR 0.02 | 1.3676 (1 run) | discard (736 steps) |
+| Batch 2^14 + Muon LR 0.03 | 1.3589 (1.359, 1.359, 1.359) | **keep** (-0.0044) |
+| Muon LR 0.04 at 2^14 | 1.3578 | **keep** (-0.0011) |
+| Muon LR 0.05 at 2^14 | 1.3536 (1.353, 1.354, 1.354) | **keep** (-0.0042) |
+| Muon LR 0.07 at 2^14 | 1.3574 (1 run) | discard |
+| Batch 2^15 (device batch 16) + Muon LR 0.07 | 1.3651 (1 run) | discard (378 steps) |
+| Embedding LR 1.5 at 2^14 | 1.3584 | discard (one unstable run at 1.365) |
+| Unembedding LR 0.006 at 2^14 | 1.3614 (1 run) | discard |
+| Muon momentum 0.9 at 2^14 | 1.3632 (1 run) | discard |
+| Muon momentum 0.8 at 2^14 | 1.3640 (1 run) | discard |
+
+- **Batch size and LR interact.** Batch 2^14 lost at the old Muon LR but won once the LR was raised. The optimum moved from (2^13, LR 0.02) to (2^14, LR 0.05). Muon is known to favor larger batches with higher LRs, and that pattern shows up here.
+- **2^15 is too far.** It leaves only 378 steps in the budget.
+- **What held at 2^14:** the AdamW LRs (embedding 1.0, unembedding 0.004) and Muon momentum 0.85 are still optimal.
+
 ## Current state
 `train.py` is the kept config:
 - depth 4, width 256, pattern SSSL with block-local short window 32 and one full-attention layer
-- batch 2^13 (device batch 4)
-- Muon for the block matrices (LR 0.02, momentum 0.85, weight decay 0.1)
+- batch 2^14 (device batch 8)
+- Muon for the block matrices (LR 0.05, momentum 0.85, weight decay 0.1)
 - AdamW for the rest (embedding LR 1.0, unembedding LR 0.004)
 - warmdown 0.85
 - the compiled loss/grad function
 
-Its val_bpb is 1.3634 (3-run mean), against the 2.277 baseline.
+Its val_bpb is 1.3536 (3-run mean), against the 2.277 baseline.
 
 | Milestone | val_bpb |
 |---|---|
@@ -203,5 +222,6 @@ Its val_bpb is 1.3634 (3-run mean), against the 2.277 baseline.
 | Warmdown 0.85 | 1.370 |
 | Weight decay 0.1 | 1.366 |
 | Short window 64, then 32 | 1.363 |
+| Batch 2^14 with Muon LR 0.05 | 1.354 |
 
-The loop is still running overnight.
+The loop is still running.
