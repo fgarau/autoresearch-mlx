@@ -130,14 +130,45 @@ After the `mx.compile` win, I tested larger changes instead of learning-rate twe
   - *Depth 5:* with `ASPECT_RATIO` 64 it also widens the model from 256 to 384. That roughly halves the step count, which is what sank depth 6 in phase 1.
   - *Gradient clipping:* Muon normalizes the matrix updates and Adam is close to scale-invariant, so global-norm clipping would barely change the updates.
 
+## Phase 5: overnight run (profiling, block-local attention, schedule)
+
+### Profiling
+I profiled the training step on this machine, an Apple M4 (base). The scratch scripts are not in the repo.
+- **Vocabulary head:** the matmuls against the 32768-token vocabulary are compute-bound at about 3.2 TFLOPS. Rewriting the loss (manual logsumexp, chunking, bf16 softcap, no softcap) saved at most about 5%. fp16 matmuls are no faster than bf16. There is no cheap win left here.
+- **Attention:** about 25 ms per layer (forward and backward), roughly 100 ms of each ~255 ms step. The three short-window "S" layers computed the full 2048 x 2048 attention and masked half of it away, so the window saved nothing. Passing `mask="causal"` instead of an array mask made no difference.
+
+### Block-local attention
+`block_local_attention` splits the sequence into blocks the size of the window. Each query block attends only to its own block and the previous one, through `scaled_dot_product_attention` with a small (window x 2 window) mask. The mask's shape picks the path: 4-D means block-local, 2-D means full attention. `create_block_local_mask` replaces `create_sliding_window_mask`.
+- **Correctness:** the output matches masked full attention exactly (max difference 0.0) for window 256.
+- **Speed:** each short-window layer is about 2.7x faster at window 256, and steps went from about 255 ms to about 225-235 ms.
+- **Size:** 43 added and 9 removed lines in `train.py`.
+
+| Experiment | val_bpb | Verdict |
+|---|---|---|
+| Depth 6 at width 256 (`ASPECT_RATIO` 42), before block attention | 1.4546 (1 run) | discard (370 ms/step) |
+| Block-local attention, short window 256 (was 1024) | 1.3767 (1.375, 1.377, 1.378) | **keep** (-0.027) |
+| Short window 128 | 1.3751 (1.375, 1.375, 1.375) | **keep** (-0.0016) |
+| Depth 5 at width 256, pattern SSSSL | 1.3848 (1 run) | discard (251 ms/step) |
+| Warmdown 0.6 | 1.3730 | **keep** (-0.002) |
+| Warmdown 0.7 | 1.3709 | **keep** (-0.002) |
+| Warmdown 0.85 | 1.3700 | **keep** (-0.0009) |
+| Warmdown 1.0 | 1.3697 | discard (tie, P = 0.79) |
+| Muon LR 0.025 | 1.3709 (1 run) | discard |
+
+- **Block-local attention was the big win of the night.** It made the step faster and the shorter window cost nothing in quality.
+- **Noise is now tiny.** The three runs of a config agree within about 0.001, so gains of 0.001-0.002 are real. The small warmdown keeps are trustworthy for that reason, though each is small.
+- **Deeper models still lose.** Even at width 256 and with cheap attention, each extra layer costs more steps than it gains in quality.
+
 ## Current state
 `train.py` is the kept config:
+- depth 4, width 256, pattern SSSL with short window 128 (block-local) and one full-attention layer
 - batch 2^13 (device batch 4)
 - Muon for the block matrices (LR 0.02, momentum 0.85, weight decay 0.2)
 - AdamW for the rest (embedding LR 1.0)
+- warmdown 0.85
 - the compiled loss/grad function
 
-Its val_bpb is 1.4037 (3-run mean), against the 2.277 baseline.
+Its val_bpb is 1.3700 (3-run mean), against the 2.277 baseline.
 
 | Milestone | val_bpb |
 |---|---|
@@ -145,7 +176,8 @@ Its val_bpb is 1.4037 (3-run mean), against the 2.277 baseline.
 | End of phase 1 (3-run rescore) | 1.551 |
 | `mx.compile` | 1.467 |
 | Muon | 1.416 |
-| Muon momentum 0.9 | 1.412 |
 | Muon momentum 0.85 | 1.404 |
+| Block-local attention (window 256, then 128) | 1.375 |
+| Warmdown 0.85 | 1.370 |
 
-The loop is paused, not finished. The easy knobs are mostly exhausted. The remaining big lever is step time, which is dominated by the full-vocabulary logits and loss. Profiling that path and making it cheaper (for example, a fused or chunked cross-entropy) is the most promising next direction. A momentum warmup schedule for Muon is also still untested.
+The loop is still running overnight. Next ideas in the queue: unembedding and embedding LR retunes, weight decay, logit softcap value, and Muon momentum under the new schedule.
