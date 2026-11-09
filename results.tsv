@@ -72,3 +72,4 @@ bb54dac	1.363368	-	keep	[rigor 3 seeds] short window 32 (marginal: -0.0007, P=0.
 b908387	1.372341	-	discard	[rigor 1 seed] window pattern SLSL (263 ms/step)
 704c111	1.366300	-	discard	[rigor 1 seed] long window 512 block-local (1426 steps, loses full context)
 1a7b6a4	1.367584	-	discard	[rigor 1 seed] batch 2^14 (device batch 8), 736 steps
+d189c14	1.358932	-	keep	[rigor 3 seeds] batch 2^14 + Muon lr 0.03 (-0.0044, P=1.00)
