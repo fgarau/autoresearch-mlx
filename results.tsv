@@ -68,3 +68,4 @@ ffac961	1.367167	-	discard	[rigor 3 seeds] logit softcap 10 (P=0.05)
 36af98f	1.367381	-	discard	[rigor 1 seed] embedding LR 1.5
 0c046a3	1.366331	-	discard	[rigor 3 seeds] Muon momentum 0.9 retest (tie, P=0.45)
 cf09dbd	1.364059	-	keep	[rigor 3 seeds] short window 64 (-0.0023, P=1.00)
+bb54dac	1.363368	-	keep	[rigor 3 seeds] short window 32 (marginal: -0.0007, P=0.95)
