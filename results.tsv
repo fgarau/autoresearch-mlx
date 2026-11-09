@@ -82,3 +82,4 @@ a044fde	1.358406	-	discard	[rigor 3 seeds] embedding LR 1.5 at batch 2^14 (unsta
 a1ade58	1.363179	-	discard	[rigor 1 seed] Muon momentum 0.9 at batch 2^14
 e84267c	1.364027	-	discard	[rigor 1 seed] Muon momentum 0.8 at batch 2^14
 99dc706	1.352640	-	keep	[rigor 3 seeds] weight decay 0.05 at batch 2^14 (-0.0009, P=0.99)
+244bab7	1.360436	-	discard	[rigor 1 seed] value embeddings on all layers (retest)
