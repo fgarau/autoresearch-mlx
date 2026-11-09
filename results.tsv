@@ -80,3 +80,4 @@ e234863	1.357417	-	discard	[rigor 1 seed] Muon lr 0.07 at batch 2^14
 a044fde	1.358406	-	discard	[rigor 3 seeds] embedding LR 1.5 at batch 2^14 (unstable seed 3)
 6bf0ed5	1.361430	-	discard	[rigor 1 seed] unembedding LR 0.006 at batch 2^14
 a1ade58	1.363179	-	discard	[rigor 1 seed] Muon momentum 0.9 at batch 2^14
+e84267c	1.364027	-	discard	[rigor 1 seed] Muon momentum 0.8 at batch 2^14
